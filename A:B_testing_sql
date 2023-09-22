@@ -1,0 +1,149 @@
+-- Q1: Compare the final_assignments_qa table to the assignment events we captured for user_level_testing. Write an answer to the following question: Does this table have everything you need to compute metrics like 30-day view-binary?
+
+SELECT
+    *
+FROM
+    dsv1069.final_assignments_qa LIMIT 100;
+-- Q1 answer: No. We need created_at date to compute metrics like 30-day view-binary.
+
+-- Q2: Write a query and table creation statement to make final_assignments_qa look like the final_assignments table. If you discovered something missing in part 1, you may fill in the value with a place holder of the appropriate data type.
+
+SELECT item_id,
+       test_a AS test_assignment,
+       (CASE
+            WHEN test_a IS NOT NULL then 'test_a'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_a IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa
+UNION
+SELECT item_id,
+       test_b AS test_assignment,
+       (CASE
+            WHEN test_b IS NOT NULL then 'test_b'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_b IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa
+UNION
+SELECT item_id,
+       test_c AS test_assignment,
+       (CASE
+            WHEN test_c IS NOT NULL then 'test_c'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_c IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa
+UNION
+SELECT item_id,
+       test_d AS test_assignment,
+       (CASE
+            WHEN test_d IS NOT NULL then 'test_d'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_d IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa
+UNION
+SELECT item_id,
+       test_e AS test_assignment,
+       (CASE
+            WHEN test_e IS NOT NULL then 'test_e'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_e IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa
+UNION
+SELECT item_id,
+       test_f AS test_assignment,
+       (CASE
+            WHEN test_f IS NOT NULL then 'test_f'
+            ELSE NULL
+        END) AS test_number,
+       (CASE
+            WHEN test_f IS NOT NULL then '2013-01-05 00:00:00'
+            ELSE NULL
+        END) AS test_date
+FROM dsv1069.final_assignments_qa;
+
+-- Q3: Use the final_assignments table to calculate the order binary for the 30 day window after the test assignment for item_test_2 (You may include the day the test started)
+
+SELECT test_assignment,
+       SUM(order_binary) AS order_binary,
+       COUNT(DISTINCT item_id) AS items_number
+FROM
+  (SELECT assignments.item_id,
+          assignments.test_assignment,
+          assignments.test_number,
+          assignments.test_start_date,
+          assignments.created_at,
+          MAX(CASE
+                  WHEN (created_at > test_start_date
+                        AND DATE_PART('day', created_at - test_start_date) <= 30) THEN 1
+                  ELSE 0
+              END) AS order_binary
+   FROM
+     (SELECT final_assignments.*,
+             DATE(orders.created_at) AS created_at
+      FROM dsv1069.final_assignments AS final_assignments
+      LEFT JOIN dsv1069.orders AS orders
+        ON final_assignments.item_id = orders.item_id
+        WHERE test_number = 'item_test_2') AS assignments
+   GROUP BY assignments.item_id,
+            assignments.test_assignment,
+            assignments.test_number,
+            assignments.test_start_date,
+            assignments.created_at) AS order_binary
+GROUP BY test_assignment;
+
+-- Q4: Use the final_assignments table to calculate the view binary, and average views for the 30 day window after the test assignment for item_test_2. (You may include the day the test started)
+
+SELECT test_assignment,
+       test_number,
+       SUM(view_binary_30d) AS view_binary,
+       COUNT(DISTINCT item) AS items_number,
+       AVG(view_binary_30d) AS avg_binary
+FROM
+  (SELECT final_assignments.item_id AS item,
+          test_assignment,
+          test_number,
+          test_start_date,
+          MAX((CASE
+                   WHEN date(event_time) - date(test_start_date) BETWEEN 0 AND 30 THEN 1
+                   ELSE 0
+               END)) AS view_binary_30d
+   FROM dsv1069.final_assignments
+   LEFT JOIN dsv1069.view_item_events
+     ON final_assignments.item_id = view_item_events.item_id
+   WHERE test_number = 'item_test_2'
+   GROUP BY final_assignments.item_id,
+            test_assignment,
+            test_number,
+            test_start_date) AS view_binary
+GROUP BY test_assignment,
+         test_number,
+         test_start_date;
+
+-- Q5: Use the https://thumbtack.github.io/abba/demo/abba.html to compute the lifts in metrics and the p-values for the binary metrics (30 day order binary and 30 day view binary) using a interval 95% confidence.
+--For order binary, p value is 0.93, lift in metrics is -12% – 11% (-0.5%)
+--For view binary, p value is 0.25, lift in metrics is -1.6% – 6.1% (2.3%)
+
+--Q6: Use Mode’s Report builder feature to write up the test. Your write-up should include a title, a graph for each of the two binary metrics you’ve calculated. The lift and p-value (from the AB test calculator) for each of the two metrics, and a complete sentence to interpret the significance of each of the results.
+--graph of order binary: https://app.mode.com/editor/tinayiluoroom/reports/cec467c65b98/queries/a30828e0adf4
+--graph of view binary: https://app.mode.com/editor/tinayiluoroom/reports/cec467c65b98/queries/a30828e0adf4
+--For order binary, p value is 0.93, lift in metrics is -12% – 11% (-0.5%). There is no significant difference in the number of orders within 30days of the assigned treatment between control and treated groups.
+--For view binary, p value is 0.25, lift in metrics is -1.6% – 6.1% (2.3%). There is no significant difference in the number of views within 30days of the assigned treatment between control and treated groups.
